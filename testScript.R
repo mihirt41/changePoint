@@ -12,8 +12,8 @@ plot(y)
 
 
 
-segment(x, y, 1)
-
+results <- segment(x, y, 1)
+lines(results$fittedValues)
 # Two Change Point test
 x <- 1:20
 y1 <- 2 + 3*x[1:8] + rnorm(8, mean = 0, sd = 2)
@@ -22,8 +22,8 @@ y3 <- -120 + 8*x[16:20] + rnorm(5, mean = 0, sd = 5)
 y <- c(y1,y2,y3)
 plot(y)
 
-solvedParams <- twoChangePoints(x, y, 2, 3)
-fittedValues <- fitTwoChangePoints(solvedParams, x, 2, 3)
+solvedParams <- twoChangePoints(x, y, 8, 15)
+fittedValues <- fitTwoChangePoints(solvedParams, x, 8, 15)
 lines(fittedValues)
 
 

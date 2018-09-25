@@ -159,7 +159,7 @@ segment <- function(x, y, numChangePoint){
       
     }
     
-    changePoint <- which(rss == min(rss)) + 2
+    changePoint <- which(rss == min(rss)) + 1 
     params <- oneChangePoint(x, y, changePoint)
     fittedValues <- fitOneChangePoint(params, x, changePoint)
     
