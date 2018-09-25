@@ -115,6 +115,10 @@ twoChangePoints <- function(xVector, yVector, c1, c2){
 # This function fits the parameters of a one change point model to the data, and returns a vector of the fitted values
 fitOneChangePoint <- function(paramsVector, x, c1){
   
+  
+  c1 <- length(x[x<=c1])
+  
+  
   firstHalf <- paramsVector[1] + paramsVector[2]*x[1:(c1)]
   secondHalf <- firstHalf[c1] + (paramsVector[2] + paramsVector[3]) * x[1:(length(x) - c1)]
   fittedValues <- c(firstHalf, secondHalf)
@@ -126,6 +130,8 @@ fitOneChangePoint <- function(paramsVector, x, c1){
 # This function fits the parameters of a two change point model to the data, and returns a vector the fitted values
 fitTwoChangePoints <- function(paramsVector, x, c1, c2){
   
+  c1 <- length(x[x <= c1])
+  c2 <- length(x[x <= c2])
   first <- paramsVector[1] + paramsVector[2]*x[1:(c1)]
   second <- first[c1] + (paramsVector[2] + paramsVector[3]) * x[1:(c2-c1)]
   third <- second[(c2 - c1)] + (paramsVector[2] + paramsVector[3] + paramsVector[4]) * x[1:(length(x) - length(first) - length(second))]
@@ -148,6 +154,7 @@ rssFunc <- function(fittedY, actualY){
 
 segment <- function(x, y, numChangePoint){
   
+  if (numChangePoint == 1){
     rss <- numeric(length((2:(length(x) - 1))))
     count <- 1
     for (c in (2:(length(x)-1))){
@@ -161,25 +168,99 @@ segment <- function(x, y, numChangePoint){
     
     changePoint <- which(rss == min(rss)) + 1 
     params <- oneChangePoint(x, y, changePoint)
-    fittedValues <- fitOneChangePoint(params, x, changePoint)
+    params <- c(params, changePoint)
+    newValues <- oneCpOptimizer(params, x, y)
+    params <- newValues$par
     
-    returnValue <- as.data.frame(cbind(changePoint, params, fittedValues))
-    
-    return(returnValue)
+    return(params)
+  }
   
+  if (numChangePoint == 2){
+    
+    pairs <- combn((2:(length(x)-1)), m = 2) 
+    rss <- numeric(length(pairs[1,]))
+    
+    for (i in 1:length(pairs[1,])){
+    
+      params <- twoChangePoints(x, y, pairs[1,i], pairs[2,i])
+      fittedValues <- fitTwoChangePoints(params, x, pairs[1,i], pairs[2,i])
+      rss[i] <- rssFunc(fittedValues, y)
+    }
+    
+    indexMin <- which(rss == min(rss))
+    c1 <- pairs[1,indexMin]
+    c2 <- pairs[2,indexMin]
+    
+    solvedParams <- twoChangePoints(x, y, c1, c2)
+    params <- c(solvedParams, c1, c2)
+    newValues <- twoCpOptimizer(params, x, y)
+    params <- newValues$par
+    return(params)
+    
+  }
 }
 
 
+# Trying to use the optim function to make some tweaks to our found change point
 
+oneCpOptimizer <- function(params, x, y){
+  
+  # alpha is intercept, beta is initial slope, betaDelta is second slope, c is changepoint
+  functionToOptimize <- function(params){
+    alpha <- params[1]
+    beta <- params[2]
+    betaDelta <- params[3]
+    c <- params[4]
+    
+    x1 <- x[x <= c] 
+    x1 <- 1:length(x1)
+    x2 <- x[x > c]
+    x2 <- 1:length(x2)
+    y1 <- y[1:length(x1)]
+    y2 <- y[(length(x1) + 1):length(y)]
+    
+    # function we are optimizing - sum of squares
+    (sum((y1 - alpha - beta*x1)^2))*(1/length(x1)) + sum((y2 - alpha - beta*c - (beta + betaDelta)*x2)^2)*(1/length(x2))
+    
+    
+  }
+  
+  newParams <- optim(params, functionToOptimize, method = "BFGS")
+  return(newParams)
+  
+}
 
-
-
-
-
-
-
-
-
+twoCpOptimizer <- function(params, x, y){
+  
+  # alpha is intercept, beta is initial slope, betaDelta is second slope, c is changepoint
+  functionToOptimize <- function(params){
+    alpha <- params[1]
+    beta <- params[2]
+    betaDeltaOne <- params[3]
+    betaDeltaTwo <- params[4]
+    c1 <- params[5]
+    c2 <- params[6]
+    
+    x1 <- x[x <= c1] 
+    x1 <- 1:length(x1)
+    x2 <- x[x > c1 & x <= c2]
+    x2 <- 1:length(x2)
+    x3 <- x[x > c2]
+    x3 <- 1:length(x3)
+    y1 <- y[1:length(x1)]
+    y2 <- y[(length(x1) + 1):(length(x1) + length(x2))]
+    y3 <- y[(length(x1)+length(x2) + 1) : length(y)]
+    
+    # function we are optimizing - sum of squares
+    (sum((y1 - alpha - beta*x1)^2))*(1/length(x1)) + sum((y2 - alpha - beta*c1 - (beta + betaDeltaOne)*x2)^2)*(1/length(x2)) + (sum((y3 - alpha - beta*c1 - (beta + betaDeltaOne)*(c2 - c1) - (beta + betaDeltaOne + betaDeltaTwo)*x3)^2)) * (1/length(x3))
+    
+    
+  }
+  
+  newParams <- optim(params, functionToOptimize, method = "BFGS")
+  return(newParams)
+  
+}
 
 
 
